@@ -63,13 +63,14 @@ MinIO's paid "AiStor" product.
 
 ## Demo walkthrough (via Python / boto3)
 
-`demo.py` performs the same store → access → retrieve flow programmatically,
-using `boto3` (the same SDK used for real AWS S3) pointed at the local MinIO
+All scripts live in [`demo-codes/`](demo-codes/). `demo-codes/demo.py`
+performs the same store → access → retrieve flow programmatically, using
+`boto3` (the same SDK used for real AWS S3) pointed at the local MinIO
 server:
 
 ```bash
 pip install -r requirements.txt
-python demo.py
+python demo-codes/demo.py
 ```
 
 Steps performed:
@@ -155,10 +156,7 @@ Policy used (only allows `GetObject`/`ListBucket` on `demo-bucket2`):
     {
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:ListBucket"],
-      "Resource": [
-        "arn:aws:s3:::demo-bucket2",
-        "arn:aws:s3:::demo-bucket2/*"
-      ]
+      "Resource": ["arn:aws:s3:::demo-bucket2", "arn:aws:s3:::demo-bucket2/*"]
     }
   ]
 }
@@ -168,23 +166,25 @@ Policy used (only allows `GetObject`/`ListBucket` on `demo-bucket2`):
 
 ### 3. Testing the scoped key actually works
 
-`test_access_control.py` uses the scoped key (read from environment
-variables, never hardcoded) to prove the restriction is enforced
-server-side, not just configured and assumed to work:
+`demo-codes/test_access_control.py` uses the scoped key (read from
+environment variables, never hardcoded) to prove the restriction is
+enforced server-side, not just configured and assumed to work:
 
 ```powershell
 $env:SCOPED_ACCESS_KEY = "<access key from the console>"
 $env:SCOPED_SECRET_KEY = "<secret key from the console>"
-python test_access_control.py
+python demo-codes/test_access_control.py
 ```
 
 It attempts three things and confirms the expected result for each:
+
 1. **Read `demo-bucket2`** → succeeds (policy allows it)
 2. **Write to `demo-bucket2`** → denied (`PutObject` was never granted)
 3. **Read `demo-bucket`** (the other bucket) → denied (key is scoped to
    `demo-bucket2` only)
 
 Actual output:
+
 ```
 Trying to READ from demo-bucket2 (should succeed)...
   OK - found: hello.txt
@@ -200,15 +200,31 @@ Trying to access demo-bucket (should be denied, key is scoped to demo-bucket2 on
 
 For one-off, time-limited access to a single object without creating a
 whole new key, S3/MinIO supports **presigned URLs** — a signed link that
-expires after a set time (e.g. 10 minutes), generated with:
+expires after a set time, generated without exposing any access/secret
+keys to whoever receives the link.
+
+**Via code** — `demo-codes/presigned_url_demo.py` generates a link (valid
+60 seconds) to `data.txt` in the still-private `demo-bucket`:
 
 ```python
 url = s3.generate_presigned_url(
     "get_object",
     Params={"Bucket": BUCKET, "Key": FILE_NAME},
-    ExpiresIn=600,  # seconds
+    ExpiresIn=60,  # seconds
 )
 ```
+
+```bash
+python demo-codes/presigned_url_demo.py
+```
+
+Opening the printed URL works immediately (no login needed); reloading it
+after 60 seconds fails, since the signature has expired.
+
+**Via console** — the same feature is available as **Share** on any
+object's Actions panel, with a configurable expiry:
+
+![Share file, generates a presigned URL](screenshots/18-share-file-console.png)
 
 Unlike a public bucket policy (permanent, applies to everyone), a presigned
 URL is scoped to **one object** and **expires** — a much smaller blast

@@ -9,11 +9,14 @@ s3 = boto3.client(
     aws_secret_access_key="minioadmin",
 )
 
-BUCKET = "demo-bucket"
+BUCKET = "demo-bucket2"
 FILE_NAME = "hello.txt"
 
 # 1. STORE: create a bucket (skip if it already exists from the console demo)
-existing_buckets = [b["Name"] for b in s3.list_buckets()["Buckets"]]
+existing_buckets = []
+for bucket in s3.list_buckets()["Buckets"]:
+    existing_buckets.append(bucket["Name"])
+
 if BUCKET not in existing_buckets:
     s3.create_bucket(Bucket=BUCKET)
     print(f"Created bucket: {BUCKET}")

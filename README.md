@@ -73,6 +73,25 @@ python demo.py
 ```
 
 Steps performed:
+
 1. **Store** — creates a bucket (if it doesn't already exist) and uploads a file
 2. **Access** — lists objects in the bucket
 3. **Retrieve** — downloads the file back and prints its contents
+
+Actual output from running the script:
+
+![Python demo output](screenshots/09-python-demo-output.png)
+
+```
+Created bucket: demo-bucket2
+Uploaded hello.txt to bucket demo-bucket2
+Objects in bucket:
+  - hello.txt (54 bytes)
+Downloaded back as downloaded_hello.txt
+Contents: Hello from MinIO! This proves upload/download works.
+```
+
+Each line maps directly to one of the three requirements: bucket creation +
+upload (**store**), the object listing (**access**), and the download +
+printed file contents (**retrieve**) — confirming the round trip is exact,
+what was uploaded is exactly what came back down.

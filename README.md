@@ -94,3 +94,122 @@ Each line maps directly to one of the three requirements: bucket creation +
 upload (**store**), the object listing (**access**), and the download +
 printed file contents (**retrieve**) — confirming the round trip is exact,
 what was uploaded is exactly what came back down.
+
+## Access control: private, public, and scoped access
+
+By default every bucket is **private** — every request needs a valid access
+key + secret key, regardless of which machine it comes from. MinIO supports
+the same access-control model as AWS S3, with two independent layers:
+
+- **Bucket policies** — rules attached to a bucket itself, e.g. "let anyone
+  read this bucket without credentials." Applied per-bucket (or per-prefix,
+  e.g. only a `public/` folder), separate from any specific user.
+- **IAM policies** — rules attached to a specific user/access key, e.g. "this
+  key can only read `demo-bucket2`, nothing else." Applied per-identity,
+  independent of any single bucket's own policy.
+
+### 1. Making a bucket publicly readable (anonymous access)
+
+Went to Buckets → Administrator, opened `demo-bucket2` — private by default:
+
+![Bucket summary, private](screenshots/11-bucket-summary-private.png)
+
+"Anonymous" means a request with no credentials at all — the technical term
+for what's casually called "public." The **Anonymous** tab starts empty
+(no rules → fully private, no one without access + secret key can reach it):
+
+![Anonymous access, no rules yet](screenshots/12-anonymous-access-empty.png)
+
+Adding a rule: `Prefix: *` (whole bucket), `Access: readonly` — this only
+grants anonymous `GetObject`/list, never write or delete:
+
+![Add anonymous access rule](screenshots/13-add-anonymous-rule-modal.png)
+
+Rule saved — the bucket is now publicly readable, still not writable:
+
+![Anonymous access, readonly rule added](screenshots/14-anonymous-access-readonly-rule.png)
+
+Rules can also be scoped to a specific prefix (e.g. `public/*`) instead of
+the whole bucket (`*`), so only one folder is public while the rest stays
+private — useful when a bucket has both public and sensitive data.
+
+### 2. Scoped access keys (least privilege)
+
+Instead of sharing the root credentials, MinIO lets you create additional
+**access keys** restricted to a specific IAM policy — e.g. read-only access
+to one bucket only. Starts with no keys created:
+
+![Access keys list, empty](screenshots/15-access-keys-list-empty.png)
+
+Creating a new key, with **"Restrict beyond user policy"** toggled on so it
+doesn't inherit full root access:
+
+![Create access key form](screenshots/16-create-access-key-form-empty.png)
+
+Policy used (only allows `GetObject`/`ListBucket` on `demo-bucket2`):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::demo-bucket2",
+        "arn:aws:s3:::demo-bucket2/*"
+      ]
+    }
+  ]
+}
+```
+
+![Scoped access key created](screenshots/17-create-access-key-filled.png)
+
+### 3. Testing the scoped key actually works
+
+`test_access_control.py` uses the scoped key (read from environment
+variables, never hardcoded) to prove the restriction is enforced
+server-side, not just configured and assumed to work:
+
+```powershell
+$env:SCOPED_ACCESS_KEY = "<access key from the console>"
+$env:SCOPED_SECRET_KEY = "<secret key from the console>"
+python test_access_control.py
+```
+
+It attempts three things and confirms the expected result for each:
+1. **Read `demo-bucket2`** → succeeds (policy allows it)
+2. **Write to `demo-bucket2`** → denied (`PutObject` was never granted)
+3. **Read `demo-bucket`** (the other bucket) → denied (key is scoped to
+   `demo-bucket2` only)
+
+Actual output:
+```
+Trying to READ from demo-bucket2 (should succeed)...
+  OK - found: hello.txt
+
+Trying to WRITE to demo-bucket2 (should be denied)...
+  DENIED as expected: AccessDenied
+
+Trying to access demo-bucket (should be denied, key is scoped to demo-bucket2 only)...
+  DENIED as expected: AccessDenied
+```
+
+### 4. Temporary access via presigned URLs
+
+For one-off, time-limited access to a single object without creating a
+whole new key, S3/MinIO supports **presigned URLs** — a signed link that
+expires after a set time (e.g. 10 minutes), generated with:
+
+```python
+url = s3.generate_presigned_url(
+    "get_object",
+    Params={"Bucket": BUCKET, "Key": FILE_NAME},
+    ExpiresIn=600,  # seconds
+)
+```
+
+Unlike a public bucket policy (permanent, applies to everyone), a presigned
+URL is scoped to **one object** and **expires** — a much smaller blast
+radius if the link ever leaks.

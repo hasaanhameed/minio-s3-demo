@@ -7,17 +7,12 @@ venv/
 env/
 .env
 
-# SeaweedFS local data/volumes
-seaweed_data/
-*.dat
-*.idx
-weed.log
-
 # OS / editor junk
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Downloaded/retrieved demo files (keep repo clean of test artifacts)
-downloads/
+# Files created/downloaded by demo.py (test artifacts, not source)
+hello.txt
+downloaded_hello.txt

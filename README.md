@@ -79,7 +79,6 @@ Steps performed:
 3. **Retrieve** — downloads the file back and prints its contents
 
 Actual output from running the script:
-
 ![Python demo output](screenshots/09-python-demo-output.png)
 
 ```

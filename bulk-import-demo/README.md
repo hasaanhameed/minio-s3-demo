@@ -43,14 +43,17 @@ In plain terms, here's the full flow from start to finish:
 
 2. **Read the CSV in chunks of 50, not all at once.** Instead of loading
    every one of the (potentially hundreds of thousands of) rows into memory
-   and processing them one by one, the script collects 50 rows, processes
-   that batch fully, then moves to the next 50. This keeps memory usage low
-   and lets progress happen in manageable, tracked chunks.
+   upfront, the script collects 50 rows, fully processes that batch, then
+   moves to the next 50. This keeps memory usage low and lets progress
+   happen in manageable, trackable chunks.
 
-3. **Within each batch of 50, upload all the photos at the same time**
-   (up to 10 at once), instead of one after another. Uploading is mostly
-   just "waiting on the network," so doing several at once is much faster
-   than waiting for each one individually.
+3. **Within each batch of 50, upload up to 10 photos at the same time** -
+   not all 50 simultaneously, and not one at a time either. A pool of 10
+   "workers" picks up uploads from the batch; whenever one finishes, that
+   worker grabs the next one from the remaining 40, until all 50 are done.
+   Uploading is mostly just "waiting on the network," so doing several at
+   once is much faster than waiting for each one individually, without
+   opening 50 connections all at once.
 
 4. **For each photo, try the upload and never let one bad photo break
    everything.** If a specific upload fails (missing file, network issue,

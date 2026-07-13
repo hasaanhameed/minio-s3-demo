@@ -6,7 +6,10 @@ services:
       POSTGRES_DB: bulk_import_demo
       POSTGRES_PASSWORD: demopassword
     ports:
-      - "5432:5432"
+      # Host port 5434, not 5432 - a native Windows Postgres service was
+      # already bound to 5432, silently intercepting connections meant for
+      # this container.
+      - "5434:5432"
     volumes:
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
 

@@ -16,3 +16,9 @@ Thumbs.db
 # Files created/downloaded by demo.py (test artifacts, not source)
 hello.txt
 downloaded_hello.txt
+
+# Generated fake data for bulk-import-demo (reproducible via
+# generate_sample_data.py, no need to commit)
+bulk-import-demo/data/
+bulk-import-demo/sample_images/
+bulk-import-demo/failed_rows.csv

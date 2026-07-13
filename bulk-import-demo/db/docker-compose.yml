@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bulk-import-postgres
+    environment:
+      POSTGRES_DB: bulk_import_demo
+      POSTGRES_PASSWORD: demopassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: bulk-import-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: demopassword
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres

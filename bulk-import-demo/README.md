@@ -34,6 +34,43 @@ impractically slow sequential run, and any row that fails is logged
 separately instead of stopping the whole import, so it can be retried later
 without re-running everything.
 
+## How the code works (`bulk_import.py`)
+
+In plain terms, here's the full flow from start to finish:
+
+1. **Set things up.** Connect to MinIO, make sure the `profile-pictures`
+   bucket exists (create it if not), and connect to Postgres.
+
+2. **Read the CSV in chunks of 50, not all at once.** Instead of loading
+   every one of the (potentially hundreds of thousands of) rows into memory
+   and processing them one by one, the script collects 50 rows, processes
+   that batch fully, then moves to the next 50. This keeps memory usage low
+   and lets progress happen in manageable, tracked chunks.
+
+3. **Within each batch of 50, upload all the photos at the same time**
+   (up to 10 at once), instead of one after another. Uploading is mostly
+   just "waiting on the network," so doing several at once is much faster
+   than waiting for each one individually.
+
+4. **For each photo, try the upload and never let one bad photo break
+   everything.** If a specific upload fails (missing file, network issue,
+   etc.), that one row is set aside and logged - the rest of the batch
+   keeps going normally.
+
+5. **Only after all 50 uploads in the batch are done, write the successful
+   ones to the database - all at once, in a single batch insert**, not 50
+   separate ones. This is both faster and enforces the core rule: a
+   database record is only ever created once we know its photo actually
+   made it into the bucket.
+
+6. **Repeat for every batch, printing progress as it goes**, so you can see
+   uploads and inserts happening live in the terminal.
+
+7. **At the end, report totals.** If everything succeeded, there's nothing
+   left over. If some rows failed, they're saved in `failed_rows.csv` so
+   they can be retried later - without needing to reprocess everything that
+   already worked.
+
 ## Components
 
 - `generate_sample_data.py` — one-time script that creates fake demo data:

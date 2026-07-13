@@ -21,6 +21,7 @@ two systems can fall out of sync.
 ## Approach implemented here: upload-first, deterministic naming
 
 For each record:
+
 1. Upload the profile picture to MinIO first, named predictably (e.g.
    `user_12345.jpg`) so retries are safe (they simply overwrite, no
    duplicates or orphaned files from retries).
@@ -49,34 +50,67 @@ without re-running everything.
 ## Setup
 
 1. Start MinIO (same server as the main repo's demo):
+
    ```powershell
    cd C:\minio
    .\minio.exe server C:\minio\data --console-address ":9001"
    ```
 
 2. Start Postgres + pgAdmin:
+
    ```bash
    cd bulk-import-demo/db
    docker compose up -d
    ```
+
    This automatically creates the `users` table from `schema.sql` on first
    run — no manual step needed.
 
 3. Generate the fake dataset:
+
    ```bash
    python bulk-import-demo/generate_sample_data.py
    ```
+
    Produces 300 fake records:
    ![Generated CSV sample](screenshots/01-generated-csv-sample.png)
 
-4. Confirm the database is reachable and the table exists via pgAdmin
-   (`http://localhost:5050`, login `admin@example.com` / `demopassword`,
-   register a server pointing at host `postgres`, port `5432`, db
-   `bulk_import_demo`, user `postgres`):
+4. Confirm the database is reachable and the table exists. Two ways to
+   view it:
+   - **pgAdmin web** (bundled in the compose stack): `http://localhost:5050`,
+     login `admin@example.com` / `demopassword`, register a server with
+     host `postgres`, port `5432` (internal Docker network port).
+   - **pgAdmin Desktop** (or any external client): host `localhost`, port
+     `5434` (the host-mapped port from `docker-compose.yml`), db
+     `bulk_import_demo`, user `postgres`, password `demopassword`.
+
+   Either way, at this point the `users` table exists but is empty:
    ![Initial DB state, users table empty](screenshots/02-initial-db-state-pgadmin.png)
+
+   The MinIO bucket doesn't exist yet either - it gets created
+   automatically by `bulk_import.py` on first run:
+   ![MinIO, no buckets yet](screenshots/03-minio-before-empty.png)
 
 ## Running the import
 
 ```bash
 python bulk-import-demo/bulk_import.py
 ```
+
+The script logs each upload and each batch's DB insert as it happens:
+![Terminal output during the import](screenshots/05-terminal-output.png)
+
+## Result
+
+All 300 profile pictures land in the `profile-pictures` bucket:
+![MinIO, 300 objects uploaded](screenshots/04-minio-after-300-objects.png)
+
+And all 300 records are in Postgres, each with an `image_url` pointing at
+its corresponding MinIO object:
+![Postgres, 300 rows with image_url set](screenshots/06-pgadmin-final-300-rows.png)
+
+If any row's upload fails, it's written to `failed_rows.csv` instead of
+stopping the run, and can be retried later by re-running the import against
+just that file. Re-running against already-imported rows is also safe -
+the `INSERT ... ON CONFLICT DO UPDATE` in `bulk_import.py` means reruns
+update existing rows instead of creating duplicates.

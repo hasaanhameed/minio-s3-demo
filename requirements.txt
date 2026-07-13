@@ -1,1 +1,6 @@
 boto3
+psycopg2-binary
+
+# Only needed by bulk-import-demo/generate_sample_data.py, to create fake
+# placeholder images + CSV for the demo. Not used by the actual import logic.
+Pillow
